@@ -18,12 +18,69 @@ Date        Description
 ----------------------
 
 Problem:
-Reference Based PCR Duplicate Removal tool. That is, given a sam file of uniquely mapped reads, remove all PCR duplicates (retain only a single copy of each read). Develop a strategy that avoids loading everything into memory. 
-design your algorithm for single-end data, with 96 UMIs. UMI information will be in the QNAME, like so: 
-NS500451:154:HWKTMBGXX:1:11101:15364:1139:GAACAGGT. Discard any UMIs with errors (or error correct, if you're feeling ambitious).
-
+    Given a sam file of uniquely mapped reads, we are tasked with removing all PCR duplicates and retainign a single copy of each duplicate.
+    It is specified that we have restrictions on memory and the entire sam file cannot be loaded into memory.
+    Furthermore, it is asked that we allow for single-end reads or paired-end reads (if possible) and randomers or 96 umis in the parameters.
+    We have to account for soft clipping. 
 
 Description:
+    The following pseudocode is for a Reference Based PCR Duplicate Removal tool written in Python 3.
+    ***(write here what pseudocode intends to do)
+        design your algorithm for single-end data, with 96 UMIs. UMI information will be in the QNAME, like so: 
+        NS500451:154:HWKTMBGXX:1:11101:15364:1139:GAACAGGT. 
+        Discard any UMIs with errors (or error correct, if you're feeling ambitious).
+
+        Remember:
+        Samtools sort
+        Adjust for soft clipping
+        Single-end reads
+        Known UMIs
+
+Psuedocode: chua_deduper.py
+
+def argparse():
+    '''allow for user input from command line'''
+
+    -f, --file: required arg, absolute file path
+    -h, --help: by default is true, prints a USEFUL help message (e.g. help="string of text" in argparse object argument)
+
+    optional arguments:
+    -o, --output: optional arg, output path for the "dedupered" SAM file (default is current directory)
+    -p, --paired: optional arg, designates file is paired end (default is single-end reads)
+    -u, --umi: optional arg, designates file containing the list of UMIs (default is randomers)
+
+    optional mutual exclusive arguments to define which read to output: (use group = parser.add_mutually_exclusive_group(); see argparse doc)
+    default is the 1st duplicated read seen
+    -b, --best: optional arg, returns the duplicate read with the best average per base quality score 
+    -r, --random: optional arg, return a random duplicate read
+    -n, --number: optional arg, returns the nth seen duplicate read; requires integer input.
+                If integer is greater than number of duplicate reads, returns the last read seen.
+
+    return argparse arguments
+
+Example Input: A properly formated input sam file.
+***paster example***
+
+Example Output: A properly formated expected output sam file
+***paster example***
+
+def readFile():
+    '''Read the sam file line by line and call other functions'''
+
+def main():
+    main function, calls other functions
+    
+    try, except logic -> print error messages if does not work
+    
+    return None
+
+
+If your script is not capable of dealing with a particular option (ex: no paired-end functionality), your script should print an error message and quit
+
+Output the first read encountered if duplicates are found
+You may include an additional argument to designate output of a different read (highest quality or random or ???)
+
+Output a properly formatted SAM file with “_deduped” appended to the filename
 
 Function headers
 Test examples (for individual functions)
