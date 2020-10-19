@@ -24,17 +24,11 @@ Problem:
     We have to account for soft clipping. 
 
 Description:
-    The following pseudocode is for a Reference Based PCR Duplicate Removal tool written in Python 3.
-    ***(write here what pseudocode intends to do)
-        design your algorithm for single-end data, with 96 UMIs. UMI information will be in the QNAME, like so: 
-        NS500451:154:HWKTMBGXX:1:11101:15364:1139:GAACAGGT. 
-        Discard any UMIs with errors (or error correct, if you're feeling ambitious).
-
-        Remember:
-        Samtools sort
-        Adjust for soft clipping
-        Single-end reads
-        Known UMIs
+    The following pseudocode is for a Reference Based PCR Duplicate Removal tool written in Python 3 ("chua_deduper.py") that addresses the problem described above.
+    In order for this script to run correctly, the sam file will need to be sorted by the leftmost coordinates using Samtools (http://www.htslib.org/doc/samtools-sort.html).
+    
+    This script will do this ***(write here what pseudocode intends to do)***. 
+    Examples of the expected input and outputs for each function are shown after their pseudocode.
 
 Psuedocode: chua_deduper.py
 
@@ -42,18 +36,20 @@ def argparse():
     '''allow for user input from command line'''
 
     -f, --file: required arg, absolute file path
+    -s, --sampleID: required arg, SAM file 
     -h, --help: by default is true, prints a USEFUL help message (e.g. help="string of text" in argparse object argument)
 
     optional arguments:
+    -z, --zipped: optional arg, specify whether the SAM file is zipped (default is unzipped)
     -o, --output: optional arg, output path for the "dedupered" SAM file (default is current directory)
     -p, --paired: optional arg, designates file is paired end (default is single-end reads)
     -u, --umi: optional arg, designates file containing the list of UMIs (default is randomers)
 
     optional mutual exclusive arguments to define which read to output: (use group = parser.add_mutually_exclusive_group(); see argparse doc)
     default is the 1st duplicated read seen
-    -b, --best: optional arg, returns the duplicate read with the best average per base quality score 
+    -b, --best: optional arg, returns the duplicate read with the best average per base quality score
     -r, --random: optional arg, return a random duplicate read
-    -n, --number: optional arg, returns the nth seen duplicate read; requires integer input.
+    -n, --number: optional arg, returns the nth seen duplicate read; requires a positive non-zero integer input.
                 If integer is greater than number of duplicate reads, returns the last read seen.
 
     return argparse arguments
@@ -64,30 +60,88 @@ Example Input: A properly formated input sam file.
 Example Output: A properly formated expected output sam file
 ***paster example***
 
-def readFile():
-    '''Read the sam file line by line and call other functions'''
+def main(): <- this is the main function, it calls other functions as needed
+    '''Takes in a SAM file, iterates record by record, 
+    and separates records into output files based on barcode pair/quality'''
 
-def main():
-    main function, calls other functions
-    
-    try, except logic -> print error messages if does not work
-    
-    return None
+    1. takes argparse arguments and set them as variables
+        in = input file path
+        fh = file name
+        
+        By default, all optional arguments are set to "FALSE" unless returned by argparse. See below what replaces the bool.
+            zipped = FALSE; replaced with TRUE
+            out = FALSE; replaced with output file path
+            paired = FALSE; replaced with TRUE <- **** why would I need this?****
+            umi = FALSE; replaced with file path and file name designating UMIs <- **** why would I need this?*** ANSWER: for correction; can also use the paired end read if specified?
+            best = FALSE; replaced with TRUE
+            random = FALSE; replaced with TRUE
+            number = FALSE; replaced with integer
+
+    NOTE: 
+    Use boolean logic to determine or not to run pieces of codes
+    try, except statments to handle errors -> print to standard error if does not work
+
+    2. Read SAM file
+        a. open the file:
+            i. if zipped is TRUE, use gzip module. 
+        b. open an output file to which to write (do not use append):
+            i. if out is TRUE, write to that specified location
+            ii. Output a properly formatted SAM file with “_deduped” appended to the filename
+        c. read the input file line by line
+        d. ignore @ headers
+        e. store every record with the same "position" in a "dictionary of lists" using a loop:
+            i. create an empty dictionary "records"
+            ii. pull the UMI/randomer barcode info from column 1:
+                1. if UMI is true:
+                    a. 
+            ii. for the 1st record line, pull out positional information and UMI/randomer barcode as store as variables:
+                    RNAME = col 3
+                    POS = col 4
+                    FLAG = col 2
+                    BARCODE = col 1, string of ATCGN's after last ":"
+                store the record as the 0th element (e.g. "record")
+            iii. for the every subsequent line, if RNAME, POS, **FLAG**, and BARCODE are the same, add to the list as the next element.
+                NOTE: for FLAG, we need to use the bitwise and to compare whether the records have the same strandedness
+                    (e.g. (A&stranded)&(B&stranded) <- returns true is same strand)
+            iv. if the next line does NOT have the same position
+                1. analyze the "records" list and choose one record from the list to write to the output file depending on the initial user inputs (see below)
+                    - if best is TRUE, call bestRead function.
+                    - elif random is TRUE, call randomRead function.
+                    - elif number is TRUE, call readNum function.
+                2. reset the "records" variable to an empty list
+                3. set the new line as the 0th element
+            v. repeat above steps for all records in the file
+        
+QUESTION: multiple reads mapping to the same leftmost position, but of different UMI/randomers? -> may need to be a dictionary of lists where key is the barcode, and the value is a list
+QUESTION: where do we address soft clipping? check CIGAR string
+QUESTION: where are printing error messages?
+
+Additional functionality if paired-end reads:
+        c. check is barcode has N in sequence
+            - if the number of N is 1:
+                * call error correction function
+                * continue below
+            - else:
+                * add barcode pairss to header line (add2header function)
+                * output R1/R4 to low quality FASTQ files
+
+Additional functionality?
+    1. analysis of the quality scores
+    2. print the number of times we have seen a particular UMI/randomer? 
 
 
-If your script is not capable of dealing with a particular option (ex: no paired-end functionality), your script should print an error message and quit
 
-Output the first read encountered if duplicates are found
-You may include an additional argument to designate output of a different read (highest quality or random or ???)
 
-Output a properly formatted SAM file with “_deduped” appended to the filename
+
+
+
+
+
 
 Function headers
-Test examples (for individual functions)
+best examples (for individual functions)
 Return statement
 
 Write examples:
 Include a properly formated input sam file
 Include a properly formated expected output sam file
-Develop your algorithm using pseudocode
-Determine high level functions
