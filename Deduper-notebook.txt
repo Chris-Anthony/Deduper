@@ -1,0 +1,36 @@
+----------------------
+|       Deduper      |
+----------------------
+
+Christian Chua
+Bioninformatics 610/624
+Fall 2020
+
+----------------------
+| Table of Contents  |
+----------------------
+
+Date        Description
+10/19/2020  Pseudocode
+
+----------------------
+|     10/19/2020     |
+----------------------
+
+Problem:
+Reference Based PCR Duplicate Removal tool. That is, given a sam file of uniquely mapped reads, remove all PCR duplicates (retain only a single copy of each read). Develop a strategy that avoids loading everything into memory. 
+design your algorithm for single-end data, with 96 UMIs. UMI information will be in the QNAME, like so: 
+NS500451:154:HWKTMBGXX:1:11101:15364:1139:GAACAGGT. Discard any UMIs with errors (or error correct, if you're feeling ambitious).
+
+
+Description:
+
+Function headers
+Test examples (for individual functions)
+Return statement
+
+Write examples:
+Include a properly formated input sam file
+Include a properly formated expected output sam file
+Develop your algorithm using pseudocode
+Determine high level functions
