@@ -54,11 +54,98 @@ def argparse():
 
     return argparse arguments
 
-Example Input: A properly formated input sam file.
-***paster example***
+    Example Input: A properly formated input sam file.
+    ***paster example***
 
-Example Output: A properly formated expected output sam file
-***paster example***
+    Example Output: A properly formated expected output sam file
+    ***paster example***
+
+def checkCIGAR(str, int)->int:
+    ```takes the CIGAR string and leftmost position and corrects the position if there has been soft clipping```
+
+    1. if there is an "S" at the beginning of the CIGAR string (compare to first element of re.findall list)
+        a. use regular expressions to pull the number in front of the S
+        b. subtract that number from the leftmost position and make that the new position
+    2. else do nothing
+
+    return updated leftmost position
+
+    Example 1 Inputs: 1S61M4S, 100
+    Example 1 Output: 99
+
+    Example 2 Inputs: 65M1S, 100
+    Example 2 Output: 100
+
+def bestRead(dict)->dict:
+    ```iterates through each list and chooses the read with the highest average per base quality score```
+
+    1. create a variable "max_quality" and set it equal to zero
+    2. create a variable "best_record" and set it equal to the string "empty"
+    3. for key in dictionary, look at each list one by one
+        a. for each list, iterate through its elements, which are records:
+            i. create a variable "avg_quality" and set it equal to zero
+            ii. pull out the quality sequence in column 11
+            iii. iterate through each character in quality sequence
+                1. convert the letter to a phred score <- which conversion to use?***
+                2. add value to "avg_quality"
+            iv. divide "avg_quality" by the length of the quality sequence (replace "avg_quality" value with that value)
+                1. if "avg_quality" is greater than "max_quality",
+                    a. set "max_quality" equal to "avg_quality"
+                    b. set "best_record" equal to the current record.
+                2. else, do nothing
+            v. repeat above steps for each element in current list
+            vi. lastly, replace the entire list with the "best_record"
+    4. repeat above for each key-value pair
+
+    return updated "records" dictionary whose values are now lists of one element, the best read
+
+    Example 1 Input: dictionary(barcode1:[record1, record2, record3], barcode2:[record4], barcode3:[record5, record6, etc.])
+    Example 1 Output: dictionary(barcode1:[record1], barcode2:[record4], barcode3:[record6])
+
+    Example 2 Input: NOTE, it has been formated with whitespace for readability
+        (AACGCCAT: 
+            [NS500451:154:HWKTMBGXX:1:11101:94095:71756:AACGCCAT	0	2	76875967	36	15M470N56M	*	0	0	GTGGGATGAGGCGCTCTTTTATATTGAGTTGGGCTGTGCAGGAGTCTTTTCCCACTTCATTGACGGCTEST	6<EEEEEEEEEEEEAEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU	XS:A:-	XG:Z:A
+            , NS500451:154:HWKTMBGXX:1:11101:69992:67325:AACGCCAT	0	2	76875967	36	15M470N56M	*	0	0	GTGGGATGAGGCGCTCTTTTATATTGAGTTGGGCTGTGCAGGAGTCTTTTCCCACTTCATTGACGGCGTAG	6<EEEEEEEEEEEEAEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEA	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU	XS:A:-	XG:Z:A]
+        , ATCGAACC:
+            [NS500451:154:HWKTMBGXX:1:11101:10266:1114:ATCGAACC	0	2	76875957	36	25M470N46M	*	0	0	GTGAAACTCGGTGGGATGAGGCGCTCTTTTATATTGAGTTGGGCTGTGCAGGAGTCTTTTCCCACTTCATT	6<EAEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEAEEAEEEEEEE	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU	XS:A:-	XG:Z:A]
+        , GTGATGTC:
+            [NS500451:154:HWKTMBGXX:1:11101:5571:1221:GTGATGTC	0	2	76901561	36	71M	*	0	0	TTCCAGGTACACAAAAGTCTTCTGAGTAAACAACCTGTACTTTTTGCTACTTCGGATCTGCTTCTTGTCTT	6AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEA	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU
+            , NS500451:154:HWKTMBGXX:1:11101:86637:67646:GTGATGTC	0	2	76901561	36	71M	*	0	0	TTCCAGGTACACAAAAGTCTTCTGAGTAAACAACCTGTACTTTTTGCTACTTCGGATCTGCTTCTTGTEST	6AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU])
+    Example 2 Output:
+        (AACGCCAT: 
+            [NS500451:154:HWKTMBGXX:1:11101:94095:71756:AACGCCAT	0	2	76875967	36	15M470N56M	*	0	0	GTGGGATGAGGCGCTCTTTTATATTGAGTTGGGCTGTGCAGGAGTCTTTTCCCACTTCATTGACGGCTEST	6<EEEEEEEEEEEEAEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU	XS:A:-	XG:Z:A]
+            , ATCGAACC:
+            [NS500451:154:HWKTMBGXX:1:11101:10266:1114:ATCGAACC	0	2	76875957	36	25M470N46M	*	0	0	GTGAAACTCGGTGGGATGAGGCGCTCTTTTATATTGAGTTGGGCTGTGCAGGAGTCTTTTCCCACTTCATT	6<EAEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEAEEAEEEEEEE	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU	XS:A:-	XG:Z:A]
+        , GTGATGTC:
+            [NS500451:154:HWKTMBGXX:1:11101:5571:1221:GTGATGTC	0	2	76901561	36	71M	*	0	0	TTCCAGGTACACAAAAGTCTTCTGAGTAAACAACCTGTACTTTTTGCTACTTCGGATCTGCTTCTTGTEST	6AEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE	MD:Z:71	NH:i:1	HI:i:1	NM:i:0	SM:i:36	XQ:i:40	X2:i:0	XO:Z:UU])
+
+def randomRead(dict)->dict:
+    ```iterates through each list and choses a random read from each list```
+
+    1. for key in dictionary, look at each list one by one
+        a. for each list, generate a random integer "i" between 0 and the length of list minus one using randrange(from this number, to this number) inclusive;
+        b. replace the entire list with the "i"th element of that list
+    2. repeat above fo each key-value pair
+
+    return updated "records" dictionary whose values are now lists of one element, a random read
+
+    Example Input: dictionary(barcode1:[record1, record2, record3, ..., record100])
+    Example Output: dictionary(barcode1:[record at the ith position])
+    NOTE: testing this function would require looking at the random number generated and ensuring it matches the ith element in that list.
+
+def readNum(int, dict)->dict:
+    ```chooses the (n-1)th element in list and returns it. If n is greater than the length of the list, returns the last element```
+
+    1. for key in dictionary, look at each list one by one
+        a. for each list, 
+            1. if n is greater than the length of the list, set the whole list equal to the last element. n was user supplied
+            2. else, set the whole list equal to the (n-1)th element.
+    2. repeat the above for each key-value pair
+
+    return updated "records" dictionary whos values are now lists of one element, the nth or last element of the original list.
+
+    Example Input: n=28, dictionary(barcode1:[record1, record2, record3, ..., record100])
+    Example Output: dictionary(barcode1:[record at the 27th element])
 
 def main(): <- this is the main function, it calls other functions as needed
     '''Takes in a SAM file, iterates record by record, 
@@ -81,7 +168,12 @@ def main(): <- this is the main function, it calls other functions as needed
     Use boolean logic to determine or not to run pieces of codes
     try, except statments to handle errors -> print to standard error if does not work
 
-    2. Read SAM file
+    2. if UMI is true:
+        a. open UMI file at path specified
+        b. store barcodes as a list "UMI_list"
+        c. used in part 3.e.ii.
+
+    3. Read SAM file
         a. open the file:
             i. if zipped is TRUE, use gzip module. 
         b. open an output file to which to write (do not use append):
@@ -90,30 +182,44 @@ def main(): <- this is the main function, it calls other functions as needed
         c. read the input file line by line
         d. ignore @ headers
         e. store every record with the same "position" in a "dictionary of lists" using a loop:
+
             i. create an empty dictionary "records"
-            ii. pull the UMI/randomer barcode info from column 1:
-                1. if UMI is true:
-                    a. 
-            ii. for the 1st record line, pull out positional information and UMI/randomer barcode as store as variables:
-                    RNAME = col 3
-                    POS = col 4
-                    FLAG = col 2
-                    BARCODE = col 1, string of ATCGN's after last ":"
-                store the record as the 0th element (e.g. "record")
-            iii. for the every subsequent line, if RNAME, POS, **FLAG**, and BARCODE are the same, add to the list as the next element.
+            ii. for the 1st record line, pull the UMI/randomer barcode info from column 1:
+                1. pull out positional information and store them as variables
+                    a. RNAME = col 3 of record
+                    b. POS = col 4 of record
+                        i. call checkCIGAR function to check for soft clipping and "correct" the leftmost position
+                    c. FLAG = col 2 of record
+                2. if UMI is true:
+                    a. if barcode is in UMI_list, store barcode as a key in the dictionary "records" with an empty list as its value
+                    b. if barcode is not in UMI_list,
+                        i. if paired is true,
+                            1. use the paired read to error correct <-- how?? we didnt read the 2nd pair yet. 
+                        ii. if paired is false,
+                            1. attempt to error correct using list, allow only 1 mismatch <- HOW???
+                            2. if cannot fix error, break and go to next record line.
+                3. else, if UMI is false (then it is a randomer):
+                    a. store randomer barcode as a key in the dictionary "records" with an empty list as its value
+                4. store information about the record as the 0th element of the list in records[barcode]
+            iii. for the every subsequent line, if RNAME, POS, **FLAG**, and BARCODE are the same, add to the dictionary.
                 NOTE: for FLAG, we need to use the bitwise and to compare whether the records have the same strandedness
                     (e.g. (A&stranded)&(B&stranded) <- returns true is same strand)
-            iv. if the next line does NOT have the same position
-                1. analyze the "records" list and choose one record from the list to write to the output file depending on the initial user inputs (see below)
+                NOTE: for POS, we are calling the checkCIGAR function to check for soft clipping and "correct" the leftmost position
+                1. if the barcode already exists as a key in the dictionary "records":
+                    a. add the record to list in records[barcode] as the next element
+                2. if the barcode does NOT exists
+                    a. store barcode as a key in the dictionary "records" with an empty list as its value
+                    b. add the record to list in records[barcode] as the 0th element
+            iv. if the next line does NOT have the same "position"
+                1. analyze the "records" list and choose one record from each list in the dictionary to write to the output file depending on the initial user inputs 
+                    (see below)
                     - if best is TRUE, call bestRead function.
                     - elif random is TRUE, call randomRead function.
                     - elif number is TRUE, call readNum function.
-                2. reset the "records" variable to an empty list
-                3. set the new line as the 0th element
+                2. reset the "records" variable to an empty dictionary
             v. repeat above steps for all records in the file
         
-QUESTION: multiple reads mapping to the same leftmost position, but of different UMI/randomers? -> may need to be a dictionary of lists where key is the barcode, and the value is a list
-QUESTION: where do we address soft clipping? check CIGAR string
+QUESTION: multiple reads mapping to the same leftmost position, but of different strands?
 QUESTION: where are printing error messages?
 
 Additional functionality if paired-end reads:
