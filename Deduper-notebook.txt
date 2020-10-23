@@ -12,13 +12,15 @@ Fall 2020
 
 Date        Description
 10/19/2020  Pseudocode
+10/22/2020  Pseudocode on mate pair error correction - incomplete
+10/23/2020  Pseudocode on warning messages; included examples
 
 ----------------------
-|     10/19/2020     |
+|  10/19-23/2020     |
 ----------------------
 
 Problem:
-    Given a sam file of uniquely mapped reads, we are tasked with removing all PCR duplicates and retainign a single copy of each duplicate.
+    Given a sam file of uniquely mapped reads, we are tasked with removing all PCR duplicates and retaining a single copy of each duplicate.
     It is specified that we have restrictions on memory and the entire sam file cannot be loaded into memory.
     Furthermore, it is asked that we allow for single-end reads or paired-end reads (if possible) and randomers or 96 umis in the parameters.
     We have to account for soft clipping. 
@@ -27,10 +29,23 @@ Description:
     The following pseudocode is for a Reference Based PCR Duplicate Removal tool written in Python 3 ("chua_deduper.py") that addresses the problem described above.
     In order for this script to run correctly, the sam file will need to be sorted by the leftmost coordinates using Samtools (http://www.htslib.org/doc/samtools-sort.html).
     
-    This script will do this ***(write here what pseudocode intends to do)***. 
+    This script will take arguments from the user to determine which of the duplicate reads to keep in the output file. Required arguments are the file path 
+    and name of the file. Optional arguments include whether the file is zipped, the file path of the output file, whether the file is paired end, and whether
+    the file contains UMIs. The defaults are unzipped, current directory, single-end reads, and randomers, respectively. The name of the output file is 
+    hardcoded to be the name of the file appended with "_deduped". Error correction can be turned on. There are several mutual exclusive options for retaining 
+    the duplicate read - the read with the best average per base quality score, a random read, or the nth read seen. 
+
+    The script determines if a read is a duplicate if its position (group/chromosome number, leftmost position, and strandedness) and UMI/randomer barcode are
+    the same. Soft clipping is taken into account by default by looking at the CIGAR string. As scripts goes through each line of the input SAM file, it stores 
+    all duplicate reads in a list and choses read to output by the aforementioned methods. This script requires that the SAM files be sorted using Samtool sort
+    function before piping into the script. 
+
     Examples of the expected input and outputs for each function are shown after their pseudocode.
 
 Psuedocode: chua_deduper.py
+
+import re
+import gzip
 
 def argparse():
     '''allow for user input from command line'''
@@ -40,10 +55,11 @@ def argparse():
     -h, --help: by default is true, prints a USEFUL help message (e.g. help="string of text" in argparse object argument)
 
     optional arguments:
-    -z, --zipped: optional arg, specify whether the SAM file is zipped (default is unzipped)
+    -z, --zipped: optional arg, specify whether the SAM file is zipped (default is unzipped) <- can make this agnostic of user - if the script sees gz in filename
     -o, --output: optional arg, output path for the "dedupered" SAM file (default is current directory)
     -p, --paired: optional arg, designates file is paired end (default is single-end reads)
     -u, --umi: optional arg, designates file containing the list of UMIs (default is randomers)
+    -c, --correct: optional arg, tries to errorcorrect (default is true, must set to false)
 
     optional mutual exclusive arguments to define which read to output: (use group = parser.add_mutually_exclusive_group(); see argparse doc)
     default is the 1st duplicated read seen
@@ -52,13 +68,21 @@ def argparse():
     -n, --number: optional arg, returns the nth seen duplicate read; requires a positive non-zero integer input.
                 If integer is greater than number of duplicate reads, returns the last read seen.
 
+    1. print warning message to standard error if user did not include required arguments or included an incorrect combination of arguments (e.g. -b and -r)
+
     return argparse arguments
 
-    Example Input: A properly formated input sam file.
-    ***paster example***
+def UMIcorrect(str)->str:
+    ```takes a barcodes and attempts to find match in the global variable UMI_list.```
 
-    Example Output: A properly formated expected output sam file
-    ***paster example***
+    1. use list comprehension, try to match barcode to each item in UMI_list 
+        a. use regex allowing for one mismatch (e.g. re.fullmatch("(barcode){e<=1}", UMI_list[x])
+        b. if match object is true, 
+            return item in list
+        c. else, return false
+
+    NOTE: This function may be depreciated depending on complexity in order to minimize the amount of function.
+    NOTE: Need to consider processing time.  Essentially this is a searching algorithm. Is there a better way to do this? BOWTIE method! 
 
 def checkCIGAR(str, int)->int:
     ```takes the CIGAR string and leftmost position and corrects the position if there has been soft clipping```
@@ -158,11 +182,12 @@ def main(): <- this is the main function, it calls other functions as needed
         By default, all optional arguments are set to "FALSE" unless returned by argparse. See below what replaces the bool.
             zipped = FALSE; replaced with TRUE
             out = FALSE; replaced with output file path
-            paired = FALSE; replaced with TRUE <- **** why would I need this?****
-            umi = FALSE; replaced with file path and file name designating UMIs <- **** why would I need this?*** ANSWER: for correction; can also use the paired end read if specified?
+            paired = FALSE; replaced with TRUE <- **** why would I need this?***
+            umi = FALSE; replaced with file path and file name designating UMIs
             best = FALSE; replaced with TRUE
             random = FALSE; replaced with TRUE
             number = FALSE; replaced with integer
+            correct = TRUE; replaced with FALSE for no error correction
 
     NOTE: 
     Use boolean logic to determine or not to run pieces of codes
@@ -170,10 +195,10 @@ def main(): <- this is the main function, it calls other functions as needed
 
     2. if UMI is true:
         a. open UMI file at path specified
-        b. store barcodes as a list "UMI_list"
-        c. used in part 3.e.ii.
+        b. store barcodes as a list "UMI_list" (as a global variable)
+        c. used in part 3.e.ii.2.a
 
-    3. Read SAM file
+    3. Read SAM file - indentation demarks if/else statements or loops
         a. open the file:
             i. if zipped is TRUE, use gzip module. 
         b. open an output file to which to write (do not use append):
@@ -182,7 +207,6 @@ def main(): <- this is the main function, it calls other functions as needed
         c. read the input file line by line
         d. ignore @ headers
         e. store every record with the same "position" in a "dictionary of lists" using a loop:
-
             i. create an empty dictionary "records"
             ii. for the 1st record line, pull the UMI/randomer barcode info from column 1:
                 1. pull out positional information and store them as variables
@@ -190,64 +214,43 @@ def main(): <- this is the main function, it calls other functions as needed
                     b. POS = col 4 of record
                         i. call checkCIGAR function to check for soft clipping and "correct" the leftmost position
                     c. FLAG = col 2 of record
-                2. if UMI is true:
-                    a. if barcode is in UMI_list, store barcode as a key in the dictionary "records" with an empty list as its value
-                    b. if barcode is not in UMI_list,
-                        i. if paired is true,
-                            1. use the paired read to error correct <-- how?? we didnt read the 2nd pair yet. 
-                        ii. if paired is false,
-                            1. attempt to error correct using list, allow only 1 mismatch <- HOW???
-                            2. if cannot fix error, break and go to next record line.
-                3. else, if UMI is false (then it is a randomer):
-                    a. store randomer barcode as a key in the dictionary "records" with an empty list as its value
-                4. store information about the record as the 0th element of the list in records[barcode]
-            iii. for the every subsequent line, if RNAME, POS, **FLAG**, and BARCODE are the same, add to the dictionary.
-                NOTE: for FLAG, we need to use the bitwise and to compare whether the records have the same strandedness
+                2. pull the barcode information from column 1
+                    a. if UMI is true:
+                        i. if barcode is not in UMI_list,
+                            1. attempt to error correct, if argparse "correct" is TRUE, call UMIcorrect() 
+                            2. if cannot fix error or N>=2, exit loop and proceed to next record line
+                    b. else, if UMI is false (then it is a randomer):
+                        i. if randomer contains N and if paired is true and argparse "correct" is TRUE, attempt to correct using mate pair <- Still thinking about this. I will need to store pos/strandedness information and correct, when its pair shows up.
+                        ii. if it cannot fix error or N>=2, exit loop and proceed to next record line
+                        ii. store randomer barcode as a key in the dictionary "records" with an empty list as its value
+                    c. the barcode will be a key for the dictionary
+                    d. intilize an empty list for records[barcode]
+                3. store information about the record as the 0th element of the list in records[barcode]
+            iii. for the every subsequent line, if RNAME, POS, and **FLAG**are the same, add to the dictionary.
+                NOTE: for FLAG, we need to use the "bitwise and" to compare whether the records have the same strandedness
                     (e.g. (A&stranded)&(B&stranded) <- returns true is same strand)
                 NOTE: for POS, we are calling the checkCIGAR function to check for soft clipping and "correct" the leftmost position
-                1. if the barcode already exists as a key in the dictionary "records":
+                1. Correct the barcodes as specified in 3.e.ii.2.a/b
+                2. if the barcode already exists as a key in the dictionary "records":
                     a. add the record to list in records[barcode] as the next element
-                2. if the barcode does NOT exists
+                3. if the barcode does NOT exists
                     a. store barcode as a key in the dictionary "records" with an empty list as its value
                     b. add the record to list in records[barcode] as the 0th element
             iv. if the next line does NOT have the same "position"
-                1. analyze the "records" list and choose one record from each list in the dictionary to write to the output file depending on the initial user inputs 
+                1. analyze the current "records" dictionary and choose one record from each list in the dictionary to write to the output file depending on the initial user inputs 
                     (see below)
                     - if best is TRUE, call bestRead function.
                     - elif random is TRUE, call randomRead function.
                     - elif number is TRUE, call readNum function.
-                2. reset the "records" variable to an empty dictionary
+                2. for each key in "records", write to the output file the lists followed by newline character
+                3. reset the "records" variable to an empty dictionary
+                4. analyze the new line as described in 3.e.ii onwards
             v. repeat above steps for all records in the file
-        
-QUESTION: multiple reads mapping to the same leftmost position, but of different strands?
-QUESTION: where are printing error messages?
 
-Additional functionality if paired-end reads:
-        c. check is barcode has N in sequence
-            - if the number of N is 1:
-                * call error correction function
-                * continue below
-            - else:
-                * add barcode pairss to header line (add2header function)
-                * output R1/R4 to low quality FASTQ files
+    Example Input: A properly formated input sam file. See Github repo (https://github.com/Chris-Anthony/Deduper)
+    Example Output: A properly formated expected output sam file. See Github repo (https://github.com/Chris-Anthony/Deduper)
 
 Additional functionality?
     1. analysis of the quality scores
     2. print the number of times we have seen a particular UMI/randomer? 
-
-
-
-
-
-
-
-
-
-
-Function headers
-best examples (for individual functions)
-Return statement
-
-Write examples:
-Include a properly formated input sam file
-Include a properly formated expected output sam file
+    3. can include another outfile for rejected reads
