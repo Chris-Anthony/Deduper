@@ -14,9 +14,10 @@ Date        Description
 10/19/2020  Pseudocode
 10/22/2020  Pseudocode on mate pair error correction - incomplete
 10/23/2020  Pseudocode on warning messages; included examples
+10/25/2020  Resolved rolling window problem (and mate pair correction)
 
 ----------------------
-|  10/19-23/2020     |
+|  10/19-25/2020     |
 ----------------------
 
 Problem:
@@ -36,9 +37,9 @@ Description:
     the duplicate read - the read with the best average per base quality score, a random read, or the nth read seen. 
 
     The script determines if a read is a duplicate if its position (group/chromosome number, leftmost position, and strandedness) and UMI/randomer barcode are
-    the same. Soft clipping is taken into account by default by looking at the CIGAR string. As scripts goes through each line of the input SAM file, it stores 
-    all duplicate reads in a list and choses read to output by the aforementioned methods. This script requires that the SAM files be sorted using Samtool sort
-    function before piping into the script. 
+    the same. Soft clipping is taken into account by default by looking at the CIGAR string. Reads are considered within the same locus if the next read seen is within 
+    a certain number of bases. As scripts goes through each line of the input SAM file, it stores all reads in a list and choses the best duplicate read to output 
+    by the aforementioned methods. This script requires that the SAM files be sorted using Samtool sort function before piping into the script. 
 
     Examples of the expected input and outputs for each function are shown after their pseudocode.
 
@@ -60,6 +61,7 @@ def argparse():
     -p, --paired: optional arg, designates file is paired end (default is single-end reads)
     -u, --umi: optional arg, designates file containing the list of UMIs (default is randomers)
     -c, --correct: optional arg, tries to errorcorrect (default is true, must set to false)
+    -t, --threshold: optional arg, sets the number of bases the next read has to be within to be counted within the same locus; best practice is the insert size length (default is 350)
 
     optional mutual exclusive arguments to define which read to output: (use group = parser.add_mutually_exclusive_group(); see argparse doc)
     default is the 1st duplicated read seen
@@ -99,6 +101,28 @@ def checkCIGAR(str, int)->int:
 
     Example 2 Inputs: 65M1S, 100
     Example 2 Output: 100
+
+def ErrorCorrection(dict)->dict:
+    ```goes through the dictionary of records. If any of the keys contain an N, use its paired read to error correct```
+
+    1. Iterate through the dictionary's keys
+    2. If barcode within the key contains a N,
+        a. search through the keys for a matched object with one allowed mismatch in the barcode 
+        b. if there is one and only one matched object, 
+            i. append the old key's value (list of records) to the found key's value <- order of records was not retained from original file
+            ii. remove old key-value pair
+    3. if paired is true,
+        c. search through the again keys for a matched object with one allowed mismatch in the barcode, but of different strandedness
+            i. change the N to the correct base using the matched object (the paired read)
+    4. if there are no matches, remove key-value pair
+
+    return updated dictionary without any N's in barcodes
+
+    Example 1 Input: {CCCGGN-123456-read1:[record1, record2, record6], CCCGGG-123456-read1:[record3, record4, record5]}
+    Example 1 Output: {CCCGGG-123456-read1:[record3, record4, record5, record1, record2, record6]}
+
+    Example 2 Input: {CCCGGN-123456-read1:[record1, record2, record6], CCCGGG-123456-read2:[record3, record4, record5]}
+    Example 2 Output: {CCCGGG-123456-read1:[record1, record2, record6], CCCGGG-123456-read2:[record3, record4, record5]}
 
 def bestRead(dict)->dict:
     ```iterates through each list and chooses the read with the highest average per base quality score```
@@ -179,7 +203,7 @@ def main(): <- this is the main function, it calls other functions as needed
         in = input file path
         fh = file name
         
-        By default, all optional arguments are set to "FALSE" unless returned by argparse. See below what replaces the bool.
+        See argparse function for more details on the below variables.
             zipped = FALSE; replaced with TRUE
             out = FALSE; replaced with output file path
             paired = FALSE; replaced with TRUE <- **** why would I need this?***
@@ -188,6 +212,7 @@ def main(): <- this is the main function, it calls other functions as needed
             random = FALSE; replaced with TRUE
             number = FALSE; replaced with integer
             correct = TRUE; replaced with FALSE for no error correction
+            threshold = 350; can be replaced with any integer 
 
     NOTE: 
     Use boolean logic to determine or not to run pieces of codes
@@ -205,46 +230,50 @@ def main(): <- this is the main function, it calls other functions as needed
             i. if out is TRUE, write to that specified location
             ii. Output a properly formatted SAM file with “_deduped” appended to the filename
         c. read the input file line by line
-        d. ignore @ headers
-        e. store every record with the same "position" in a "dictionary of lists" using a loop:
+        d. copy @ headers to output file
+        e. store every record within the same locus (reads within a certain number of bases of each other) in a "dictionary of lists" using a loop:
             i. create an empty dictionary "records"
-            ii. for the 1st record line, pull the UMI/randomer barcode info from column 1:
+            ii. for the 1st record line, pull the barcode info from column 1:
                 1. pull out positional information and store them as variables
-                    a. RNAME = col 3 of record
+                    a. RNAME = col 3 of record - scaffold 
                     b. POS = col 4 of record
                         i. call checkCIGAR function to check for soft clipping and "correct" the leftmost position
-                    c. FLAG = col 2 of record
+                    c. FLAG = col 2 of record - strandedness
                 2. pull the barcode information from column 1
                     a. if UMI is true:
                         i. if barcode is not in UMI_list,
-                            1. attempt to error correct, if argparse "correct" is TRUE, call UMIcorrect() 
+                            1. attempt to error correct, call UMIcorrect() 
                             2. if cannot fix error or N>=2, exit loop and proceed to next record line
                     b. else, if UMI is false (then it is a randomer):
-                        i. if randomer contains N and if paired is true and argparse "correct" is TRUE, attempt to correct using mate pair <- Still thinking about this. I will need to store pos/strandedness information and correct, when its pair shows up.
-                        ii. if it cannot fix error or N>=2, exit loop and proceed to next record line
-                        ii. store randomer barcode as a key in the dictionary "records" with an empty list as its value
-                    c. the barcode will be a key for the dictionary
-                    d. intilize an empty list for records[barcode]
-                3. store information about the record as the 0th element of the list in records[barcode]
-            iii. for the every subsequent line, if RNAME, POS, and **FLAG**are the same, add to the dictionary.
-                NOTE: for FLAG, we need to use the "bitwise and" to compare whether the records have the same strandedness
-                    (e.g. (A&stranded)&(B&stranded) <- returns true is same strand)
-                NOTE: for POS, we are calling the checkCIGAR function to check for soft clipping and "correct" the leftmost position
-                1. Correct the barcodes as specified in 3.e.ii.2.a/b
-                2. if the barcode already exists as a key in the dictionary "records":
-                    a. add the record to list in records[barcode] as the next element
-                3. if the barcode does NOT exists
-                    a. store barcode as a key in the dictionary "records" with an empty list as its value
-                    b. add the record to list in records[barcode] as the 0th element
-            iv. if the next line does NOT have the same "position"
-                1. analyze the current "records" dictionary and choose one record from each list in the dictionary to write to the output file depending on the initial user inputs 
+                        i. if N>=2, exit loop and proceed to next record line
+                        ii. additional error correction once dictionary is filled
+                    c. the barcode, leftmost position and strandedness will become a key for the dictionary (e.g. AACTAG-1658463218-read1)
+                    d. intilize an empty list for records[key]
+                3. store the record as the 0th element of the list in records[key]
+            iii. for the every subsequent line, if RNAME, POS (+ threshold), and **FLAG** are the same, add to the dictionary.
+                1. for POS,
+                    a. we are calling the checkCIGAR function to check for soft clipping and "correct" the leftmost position
+                    b. we accept reads within a certain number of bases from the last read (set by threshold)
+                2. for FLAG, we need to use the "bitwise and" to compare whether the records have the same strandedness
+                    (e.g. (A&stranded)&(B&stranded) <- returns true if same strand)
+                3. Correct the barcodes as specified in 3.e.ii.2.a/b and create a key using the left-most position and strandedness as in 3.e.ii.2.c
+                4. if the key already exists,
+                    a. add the record to list in records[key] as the next element
+                5. if the key does NOT exist,
+                    a. store key in the dictionary "records" with an empty list as its value
+                    b. add the record to list in records[key] as the 0th element
+            iv. if the next line is not within a certain number of bases (set by threshold) from the last read's position
+                1. If UMI is false, 
+                    a. attempt to correct all keys with an N by calling ErrorCorrection function
+                        - if paired is true, there is an additional error correction step
+                2. analyze the current "records" dictionary and choose one record from each list in the dictionary to write to the output file depending on the initial user inputs 
                     (see below)
                     - if best is TRUE, call bestRead function.
                     - elif random is TRUE, call randomRead function.
                     - elif number is TRUE, call readNum function.
-                2. for each key in "records", write to the output file the lists followed by newline character
-                3. reset the "records" variable to an empty dictionary
-                4. analyze the new line as described in 3.e.ii onwards
+                3. for each key in "records", write to the output file the lists followed by newline character
+                4. reset the "records" variable to an empty dictionary
+                5. analyze the new line as described in 3.e.ii onwards
             v. repeat above steps for all records in the file
 
     Example Input: A properly formated input sam file. See Github repo (https://github.com/Chris-Anthony/Deduper)
