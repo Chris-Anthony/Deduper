@@ -17,7 +17,7 @@ def get_args():
                 help='Enter file containing the list of UMIs (unset if randomers)')
     parser.add_argument('-p','--paired',  action='store_true', 
                 required=False, help='Include if reads are paired', dest="paired")
-    parser.add_argument('-s','--sort',  action='store_false', 
+    parser.add_argument('-s','--sort',  action='store_true', 
                 required=False, help='Include if SAM file needs to be sorted', dest="sort")
 
     return parser.parse_args()
@@ -36,7 +36,7 @@ def checkCIGAR(CIGAR:str, POS:int, FLAG:str)->int:
     return POS
 
 def main(file1:str, paired:bool, umi:str, sort:bool):
-    '''Reads in SAM file, returns first line'''
+    '''Reads in a sorted SAM file. Remove PCR duplicates keeping the first PCR record seen.'''
 
     # if a UMI file was listed, create a dictionary with UMI barcodes
     if umi_file != False:
