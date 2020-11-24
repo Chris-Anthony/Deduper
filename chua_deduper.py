@@ -71,6 +71,9 @@ def main(file1:str, paired:bool, umi:str, sort:bool):
         pysam.sort("-o", input_sort, file1)
         file1 = input_sort
 
+    # empty variables
+    count_uniq, count_dup, count_lowqual = 0, 0, 0
+
     with open(file1, "r") as fh:
         for line in fh:
             if line[0] == "@":
@@ -107,27 +110,37 @@ def main(file1:str, paired:bool, umi:str, sort:bool):
                     if UMI in barcodes.keys():
                         if key in uniq_dict.keys():
                             uniq_dict[key] += 1
+                            count_dup += 1
                             out_duplicate.writelines(line)
                         else: 
                             uniq_dict[key] = 1
+                            count_uniq += 1
                             out_deduped.writelines(line)
                     else:
+                        count_lowqual += 1
                         out_lowqual.writelines(line)
                 else: # for randomers
                     if re.search("N", UMI):
+                        count_lowqual += 1
                         out_lowqual.writelines(line)
                     else:
                         if key in uniq_dict.keys():
                             uniq_dict[key] += 1
+                            count_dup += 1
                             out_duplicate.writelines(line)
                         else: 
                             uniq_dict[key] = 1
+                            count_uniq += 1
                             out_deduped.writelines(line)
 
     # Close files
     out_deduped.close()
     out_duplicate.close()
     out_lowqual.close()
+
+    print("Number of unique reads:", count_uniq)
+    print("Number of duplicate reads:", count_dup)
+    print("Number of misindexed reads:", count_lowqual)
 
     print("Complete.")
 
