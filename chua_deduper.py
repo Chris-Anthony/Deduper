@@ -23,16 +23,26 @@ def get_args():
     return parser.parse_args()
 
 def checkCIGAR(CIGAR:str, POS:int, FLAG:str)->int:
-    '''Checks the CIGAR string for soft clipping. Updates leftmost position as needed.'''
+    '''Checks the CIGAR string for soft clipping. Updates leftmost position as needed for the forward read
+    or returns the backcalculated rightmost postion for the reverse read.'''
 
-    if (int(FLAG) & 129) == 129: # reverse strand
-        soft_clip = re.search("([0-9]+)S$", CIGAR)
-    else: # forward strand or unstranded
-        soft_clip = re.search("^([0-9]+)S", CIGAR)
-
+    # forward strand or unstranded
+    soft_clip = re.search("^([0-9]+)S", CIGAR)
+    
     if soft_clip:
         POS -= int(soft_clip.group(1))
 
+        if FLAG == "reverse": # if paired is specified
+            length = 0
+            for x in re.findall("([0-9]+)", CIGAR):
+                length += int(x)
+
+            remove_length = 0 # removes insertions (and others) because they do not "consume" reference
+            for y in re.findall("([0-9]+)[IHP=X]", CIGAR):
+                remove_length += int(y)
+
+            POS = POS + length - remove_length
+        
     return POS
 
 def main(file1:str, paired:bool, umi:str, sort:bool):
@@ -47,7 +57,7 @@ def main(file1:str, paired:bool, umi:str, sort:bool):
                 barcodes[line.rstrip("\n")] = []
 
     # Creates a new file with the output name the input name but with "_deduped" appended
-    file_name = re.search("(.*)(\.sam)", file1)
+    file_name = re.search(r"(.*)(\.sam)", file1)
     # deduped file
     output_deduped = ''.join([file_name.group(1), "_deduped", file_name.group(2)])
     out_deduped = open(output_deduped, "w")
@@ -89,6 +99,11 @@ def main(file1:str, paired:bool, umi:str, sort:bool):
                 UMI = re.findall(barcode, QNAME)[0] # UMI barcode
 
                 FLAG = record[1] # strandedness info
+                if ((int(FLAG) & 32) == 32):
+                    FLAG = "forward"
+                elif ((int(FLAG) & 16) == 16):
+                    FLAG = "reverse"
+                    
                 RNAME = record[2] # chromosome/scaffold/group
 
                 # Find leftmost position, update as necessary
@@ -97,13 +112,7 @@ def main(file1:str, paired:bool, umi:str, sort:bool):
                 POS = checkCIGAR(CIGAR, int(POS), FLAG) # updated leftmost position
 
                 # Create a key unique to the read
-                if paired == True: # if paired read, positional information is available, can use length of read
-                    length = 0
-                    for x in re.findall("([0-9]+)", CIGAR):
-                        length += int(x)
-                    key = ''.join([UMI, "_", RNAME, "_", str(POS), "_", FLAG, "_", str(length)])
-                else:
-                    key = ''.join([UMI, "_", RNAME, "_", str(POS), "_", FLAG])
+                key = tuple([UMI, RNAME, POS, FLAG])
 
                 # Write to output files
                 if umi_file != False: # for UMIs
