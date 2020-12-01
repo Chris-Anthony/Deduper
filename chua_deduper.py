@@ -9,14 +9,22 @@ import re
 def get_args():
     '''Argparse code to allow for in-line command interface.'''
 
-    parser = argparse.ArgumentParser(description="""Reads in a sorted SAM file. Remove PCR duplicates keeping the first PCR record seen.""")
+    parser = argparse.ArgumentParser(description=
+    """This script removes PCR duplicates from a SAM file keeping the first record seen for each duplicate. PCR duplicates are exported to a separate file. 
+    The barcodes must be appeneded to the end of the first field in the SAM file. If the list of barcodes are known, a file with the list of barcodes can be supplied. 
+    Reads with wrong barcodes are exported to a separate file.
+    
+    The SAM file does not needed to be sorted with Samtools prior to running this script. However, there is an option to sort the SAM using the pysam library. 
+    Please install the pysam library if necessary.
+    
+    This script can handle single-end and paired-end reads.""")
     parser.add_argument('-f','--file',  action='store', nargs='?', type=str, 
-                    required=True, help='Name of sorted SAM file')
+                    required=True, help='Name of SAM file')
     parser.add_argument('-u','--umi',  action='store', nargs='?', type=str, 
                 required=False, default=False, 
                 help='Enter file containing the list of UMIs (unset if randomers)')
-    parser.add_argument('-p','--paired',  action='store_true', 
-                required=False, help='Include if reads are paired', dest="paired")
+    #parser.add_argument('-p','--paired',  action='store_true', 
+    #            required=False, help='Include if reads are paired', dest="paired")
     parser.add_argument('-s','--sort',  action='store_true', 
                 required=False, help='Include if SAM file needs to be sorted', dest="sort")
 
@@ -45,7 +53,7 @@ def checkCIGAR(CIGAR:str, POS:int, FLAG:str)->int:
         
     return POS
 
-def main(file1:str, paired:bool, umi:str, sort:bool):
+def main(file1:str, umi:str, sort:bool):
     '''Reads in a sorted SAM file. Remove PCR duplicates keeping the first PCR record seen.'''
 
     # if a UMI file was listed, create a dictionary with UMI barcodes
@@ -155,6 +163,6 @@ def main(file1:str, paired:bool, umi:str, sort:bool):
 
 if __name__ =="__main__":
     args = get_args()
-    file1, paired, umi_file, sort = args.file, args.paired, args.umi, args.sort
+    file1, umi_file, sort = args.file, args.umi, args.sort
 
-    main(file1, paired, umi_file, sort)
+    main(file1, umi_file, sort)
